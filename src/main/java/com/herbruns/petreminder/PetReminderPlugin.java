@@ -4,11 +4,13 @@ import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -22,6 +24,9 @@ import net.runelite.client.ui.overlay.OverlayManager;
 public class PetReminderPlugin extends Plugin
 {
     @Inject
+    private ItemManager itemManager;
+
+    @Inject
     private Client client;
 
     @Inject
@@ -34,6 +39,7 @@ public class PetReminderPlugin extends Plugin
     private PetReminderOverlay overlay;
 
     private boolean isPetOut = false;
+    private boolean isPetOffScreen = false;
     private boolean playerDidDie = false;
 
     private final int FOLLOWER_VARBIT = 447;
@@ -41,6 +47,7 @@ public class PetReminderPlugin extends Plugin
     @Override
     protected void startUp() throws Exception
     {
+        overlay.setLastKnownPetId(config.defaultPetIcon());
         overlayManager.add(overlay);
     }
 
@@ -58,9 +65,42 @@ public class PetReminderPlugin extends Plugin
         // i.e going in and out of ToA, for example
         int followerNpcId = client.getVarpValue(FOLLOWER_VARBIT);
         boolean overlayCache = isPetOut;
+        NPC followerNpc = null;
 
-        // You have a pet following
-        isPetOut = followerNpcId != -1;
+        if (followerNpcId != -1) {
+            followerNpc = client.getFollower();
+            if (followerNpc == null) {
+                return;
+            }
+
+            String followerName = followerNpc.getName();
+            if (followerName == null) {
+                return;
+            }
+
+            int followerId = getItemIdByName(followerName);
+            if (followerId == -1) {
+                return;
+            }
+
+            if (followerId != followerNpcId) {
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", followerName + ": " + String.valueOf(followerId), null);
+            }
+
+            overlay.setLastKnownPetId(followerId);
+            isPetOut = true;
+        }
+        else
+        {
+            isPetOut = false;
+        }
+
+        // now check if the pet is off-screen, but is following according to varbit
+        if (isPetOut)
+        {
+            isPetOffScreen = isFollowerModelOnScreen(followerNpc);
+            overlay.setIsPetOffScreen(isPetOffScreen);
+        }
 
         // if we are not the same state as last tick, change the overlay
         if (overlayCache != isPetOut) {
@@ -103,6 +143,61 @@ public class PetReminderPlugin extends Plugin
             }
             playerDidDie = false;
         }
+    }
+
+    private boolean isFollowerModelOnScreen(NPC npc)
+    {
+        if (npc == null || npc.getModel() == null)
+        {
+            return false;
+        }
+
+        Model model = npc.getModel();
+        float[] verticesX = model.getVerticesX();
+        float[] verticesY = model.getVerticesY();
+        float[] verticesZ = model.getVerticesZ();
+
+        LocalPoint lp = npc.getLocalLocation();
+        int tileHeight = Perspective.getTileHeight(client, lp, client.getPlane());
+
+        boolean anyOnScreen = false;
+
+        for (int i = 0; i < verticesX.length; i++)
+        {
+            int vx = (int) (verticesX[i] + lp.getX());
+            int vy = (int) (verticesZ[i] + lp.getY());
+            int vz = (int) (verticesY[i] + tileHeight);
+
+            Point canvasPoint = Perspective.localToCanvas(client, new LocalPoint(vx, vy), client.getPlane(), vz);
+            if (canvasPoint != null)
+            {
+                if (canvasPoint.getX() >= 0 && canvasPoint.getX() <= client.getCanvasWidth()
+                        && canvasPoint.getY() >= 0 && canvasPoint.getY() <= client.getCanvasHeight())
+                {
+                    anyOnScreen = true;
+                    break;
+                }
+            }
+        }
+
+        return anyOnScreen;
+    }
+
+    public int getItemIdByName(String name)
+    {
+        // Normalize case for safety
+        String searchName = name.toLowerCase();
+
+        // ItemManager caches all item definitions
+        for (int id = 0; id < Short.MAX_VALUE; id++)
+        {
+            ItemComposition comp = itemManager.getItemComposition(id);
+            if (comp != null && comp.getName() != null && comp.getName().toLowerCase().equals(searchName))
+            {
+                return id;
+            }
+        }
+        return -1; // not found
     }
 
     @Provides
