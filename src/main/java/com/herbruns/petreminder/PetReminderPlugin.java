@@ -4,7 +4,6 @@ import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
-import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ActorDeath;
@@ -41,7 +40,6 @@ public class PetReminderPlugin extends Plugin
     private PetReminderOverlay overlay;
 
     private boolean isPetOut = false;
-    private boolean isPetOffScreen = false;
     private boolean playerDidDie = false;
 
     private final int FOLLOWER_VARBIT = 447;
@@ -49,7 +47,6 @@ public class PetReminderPlugin extends Plugin
     @Override
     protected void startUp() throws Exception
     {
-        overlay.setLastKnownPetId(config.defaultPetIcon());
         overlayManager.add(overlay);
     }
 
@@ -96,7 +93,7 @@ public class PetReminderPlugin extends Plugin
         // now check if the pet is off-screen, but is following according to varbit
         if (isPetOut)
         {
-            isPetOffScreen = !isFollowerOnScreen(followerNpc);
+            boolean isPetOffScreen = !isFollowerOnScreen(followerNpc);
 
             if (isPetOffScreen) {
                 client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "pet OFF screen", null);

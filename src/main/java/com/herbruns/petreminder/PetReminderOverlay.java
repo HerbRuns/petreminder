@@ -17,6 +17,7 @@ public class PetReminderOverlay extends OverlayPanel
     @Getter
     private int lastKnownPetId;
 
+    private final int DEFAULT_ICON_ID = 1555; // cat
     private AsyncBufferedImage petImage;
     private boolean isPetOut = false;
     private boolean isPetOffScreen = false;
@@ -24,16 +25,22 @@ public class PetReminderOverlay extends OverlayPanel
     // pet off-screen flashing
     private boolean flashState = false;
     private long lastFlashTime = 0;
-    private static final long FLASH_INTERVAL_MS = 500; // half second toggle
+    private final Color defaultColor = new Color(0,0,0,0);
 
-    //private final Client client;
+    private final PetReminderConfig config;
     private final ItemManager itemManager;
 
+
     @Inject
-    public PetReminderOverlay(ItemManager itemManager)
+    public PetReminderOverlay(ItemManager itemManager, PetReminderConfig config)
     {
         //this.client = client;
         this.itemManager = itemManager;
+        this.config = config;
+
+        if (!config.showCorrectPetIcon()) {
+            lastKnownPetId = DEFAULT_ICON_ID;
+        }
 
         petImage = itemManager.getImage(lastKnownPetId, 1, false);
 
@@ -58,6 +65,11 @@ public class PetReminderOverlay extends OverlayPanel
 
     public void setLastKnownPetId(int lastKnownPetId)
     {
+        // possible a wasted set of calls
+        if (!config.showCorrectPetIcon()) {
+            lastKnownPetId = DEFAULT_ICON_ID;
+        }
+
         this.lastKnownPetId = lastKnownPetId;
         petImage = itemManager.getImage(lastKnownPetId, 1, false);
     }
@@ -78,10 +90,10 @@ public class PetReminderOverlay extends OverlayPanel
         }
 
         // Flash background logic
-        if (isPetOffScreen)
+        if (isPetOffScreen && config.flashIconWhenOffScreen())
         {
             long now = System.currentTimeMillis();
-            if (now - lastFlashTime > FLASH_INTERVAL_MS)
+            if (now - lastFlashTime > config.iconFlashSpeed())
             {
                 flashState = !flashState;
                 lastFlashTime = now;
@@ -90,16 +102,17 @@ public class PetReminderOverlay extends OverlayPanel
             if (flashState)
             {
                 // Fill red background behind the panel
-                panelComponent.setBackgroundColor(new Color(255, 0, 0, 128));
+                Color flashColor = config.iconFlashColor();
+                panelComponent.setBackgroundColor(flashColor);
             }
             else
             {
-                panelComponent.setBackgroundColor(new Color(255, 0, 0, 0));
+                panelComponent.setBackgroundColor(defaultColor);
             }
         }
         else
         {
-            panelComponent.setBackgroundColor(new Color(255, 0, 0, 0));
+            panelComponent.setBackgroundColor(defaultColor);
         }
 
         panelComponent.getChildren().add(new ImageComponent(petImage));
