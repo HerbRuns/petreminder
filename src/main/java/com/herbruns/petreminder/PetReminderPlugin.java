@@ -15,6 +15,8 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
+import java.awt.*;
+
 @Slf4j
 @PluginDescriptor(
         name = "Pet Reminder",
@@ -83,10 +85,6 @@ public class PetReminderPlugin extends Plugin
                 return;
             }
 
-            if (followerId != followerNpcId) {
-                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", followerName + ": " + String.valueOf(followerId), null);
-            }
-
             overlay.setLastKnownPetId(followerId);
             isPetOut = true;
         }
@@ -98,7 +96,14 @@ public class PetReminderPlugin extends Plugin
         // now check if the pet is off-screen, but is following according to varbit
         if (isPetOut)
         {
-            isPetOffScreen = isFollowerModelOnScreen(followerNpc);
+            isPetOffScreen = !isFollowerOnScreen(followerNpc);
+
+            if (isPetOffScreen) {
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "pet OFF screen", null);
+            } else {
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "pet ON screen", null);
+            }
+
             overlay.setIsPetOffScreen(isPetOffScreen);
         }
 
@@ -145,42 +150,29 @@ public class PetReminderPlugin extends Plugin
         }
     }
 
-    private boolean isFollowerModelOnScreen(NPC npc)
+    private boolean isFollowerOnScreen(NPC npc)
     {
-        if (npc == null || npc.getModel() == null)
+        if (npc == null)
         {
             return false;
         }
 
-        Model model = npc.getModel();
-        float[] verticesX = model.getVerticesX();
-        float[] verticesY = model.getVerticesY();
-        float[] verticesZ = model.getVerticesZ();
-
-        LocalPoint lp = npc.getLocalLocation();
-        int tileHeight = Perspective.getTileHeight(client, lp, client.getPlane());
-
-        boolean anyOnScreen = false;
-
-        for (int i = 0; i < verticesX.length; i++)
+        Shape hull = npc.getConvexHull();
+        if (hull == null)
         {
-            int vx = (int) (verticesX[i] + lp.getX());
-            int vy = (int) (verticesZ[i] + lp.getY());
-            int vz = (int) (verticesY[i] + tileHeight);
-
-            Point canvasPoint = Perspective.localToCanvas(client, new LocalPoint(vx, vy), client.getPlane(), vz);
-            if (canvasPoint != null)
-            {
-                if (canvasPoint.getX() >= 0 && canvasPoint.getX() <= client.getCanvasWidth()
-                        && canvasPoint.getY() >= 0 && canvasPoint.getY() <= client.getCanvasHeight())
-                {
-                    anyOnScreen = true;
-                    break;
-                }
-            }
+            return false;
         }
 
-        return anyOnScreen;
+        Rectangle bounds = hull.getBounds();
+        boolean boundsOnScreen = bounds.x + bounds.width >= 0
+                && bounds.x <= client.getCanvasWidth()
+                && bounds.y + bounds.height >= 0
+                && bounds.y <= client.getCanvasHeight();
+
+        boolean isInScene = npc.getLocalLocation().isInScene();
+
+        // do both checks in case the bounds check gets occluded for some reason (mostly a fallback)
+        return boundsOnScreen && isInScene;
     }
 
     public int getItemIdByName(String name)

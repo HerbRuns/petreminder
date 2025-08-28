@@ -65,8 +65,6 @@ public class PetReminderOverlay extends OverlayPanel
     public void setIsPetOffScreen(boolean petOffScreen)
     {
         this.isPetOffScreen = petOffScreen;
-        this.flashState = false;
-        this.lastFlashTime = 0;
     }
 
     @Override
@@ -92,9 +90,16 @@ public class PetReminderOverlay extends OverlayPanel
             if (flashState)
             {
                 // Fill red background behind the panel
-                graphics.setColor(new Color(255, 0, 0, 128)); // translucent red
-                graphics.fillRect(getBounds().x, getBounds().y, getBounds().width, getBounds().height);
+                panelComponent.setBackgroundColor(new Color(255, 0, 0, 128));
             }
+            else
+            {
+                panelComponent.setBackgroundColor(new Color(255, 0, 0, 0));
+            }
+        }
+        else
+        {
+            panelComponent.setBackgroundColor(new Color(255, 0, 0, 0));
         }
 
         panelComponent.getChildren().add(new ImageComponent(petImage));
