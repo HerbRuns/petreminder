@@ -78,6 +78,6 @@ public interface PetReminderConfig extends Config
     )
     default boolean deathMessageEnabled()
     {
-        return false;
+        return true;
     }
 }
