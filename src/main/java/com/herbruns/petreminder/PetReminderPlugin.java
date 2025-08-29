@@ -94,13 +94,6 @@ public class PetReminderPlugin extends Plugin
         if (isPetOut)
         {
             boolean isPetOffScreen = !isFollowerOnScreen(followerNpc);
-
-            if (isPetOffScreen) {
-                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "pet OFF screen", null);
-            } else {
-                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "pet ON screen", null);
-            }
-
             overlay.setIsPetOffScreen(isPetOffScreen);
         }
 
